@@ -13,7 +13,7 @@ import {
  * Detect mouse events to allow drawing
  * Exposes drawPoint and clearCanvas functions to be called from App.js when messages arrive from the server.
  */
-const Canvas = forwardRef(({ onDraw, onClear }, ref) => {
+const Canvas = forwardRef(({ onDraw, onClear, color }, ref) => {
 
   // Reference to the canvas DOM element, used for drawing and getting mouse coordinates.
   const canvasRef = useRef(null);
@@ -104,7 +104,7 @@ const Canvas = forwardRef(({ onDraw, onClear }, ref) => {
 
     // We draw locally for immediate response (without waiting for the server)
     // This makes the app feel instant for the local user
-    drawPoint(x, y, e.target.dataset.color);
+    drawPoint(x, y, color);
 
     // We notify the parent to send the message to the server
     // The server will retransmit it to ALL users
@@ -121,7 +121,7 @@ const Canvas = forwardRef(({ onDraw, onClear }, ref) => {
     const { x, y } = getCanvasCoords(e);
 
     // Same pattern: immediate local drawing + sending to the server
-    drawPoint(x, y, e.target.dataset.color);
+    drawPoint(x, y, color);
     onDraw(x, y);
   };
 
@@ -140,7 +140,6 @@ const Canvas = forwardRef(({ onDraw, onClear }, ref) => {
         ref={canvasRef}
         width={640}
         height={480}
-        data-color="#000000"        
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}

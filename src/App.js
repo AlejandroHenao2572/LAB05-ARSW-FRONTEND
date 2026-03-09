@@ -61,6 +61,7 @@ function App() {
         ref={canvasRef}
         onDraw={onDraw}
         onClear={onClear}
+        color={USER_COLOR}
       />
     </div>
   );

@@ -20,7 +20,7 @@ const useSocket = (onMessageReceived) => {
         console.log('Conecting to STOMP broker...');
 
         // Subscribe to the topic where the server will send drawing updates
-        stompClient.subscribe('/topic/board', (stompMessage) => {
+        stompClient.subscribe('/topic/draw', (stompMessage) => {
 
           const drawMessage = JSON.parse(stompMessage.body);
 
