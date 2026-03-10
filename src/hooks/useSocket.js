@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
 import { Client } from '@stomp/stompjs';
-import SockJS from 'sockjs-client';
 
 
 const useSocket = (onMessageReceived) => {
@@ -12,8 +11,8 @@ const useSocket = (onMessageReceived) => {
     //Every time the component mounts, we create a new STOMP client and connect to the server.
     const stompClient = new Client({
 
-      // Conection to the WebSocket endpoint provided by the Spring Boot server  
-      webSocketFactory: () => new SockJS('http://localhost:8080/ws-board'),
+      // Broker URL is read from the environment variable REACT_APP_WS_URL.
+      brokerURL: process.env.REACT_APP_WS_URL,
       reconnectDelay: 5000,
 
       onConnect: () => {
