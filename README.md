@@ -4,7 +4,7 @@ A real-time collaborative drawing application built with React. Multiple users c
 
 ## Project Description
 
-This frontend is a React application that interfaces with a Spring Boot WebSocket backend. It uses the **Canvas API** to render drawing operations and **@stomp/stompjs** with **SockJS** to maintain a persistent, full-duplex connection to the server.
+This frontend is a React application that interfaces with a Spring Boot WebSocket backend. It uses **P5.js** (in instance mode) to render drawing operations and **@stomp/stompjs** with **SockJS** to maintain a persistent, full-duplex connection to the server.
 
 When a user draws on the canvas, the coordinates and color are published to the backend via STOMP. The backend broadcasts the message to all subscribers, so every connected client renders the same stroke in real time. The same mechanism handles global canvas clearing.
 
@@ -25,7 +25,7 @@ src/
 ├── App.js                  # Root component. Owns application state, color assignment,
 │                           # and coordinates communication between Canvas and useSocket.
 ├── components/
-│   └── Canvas.jsx          # Renders the <canvas> element. Handles mouse events for drawing.
+│   └── Canvas.jsx          # Creates a P5.js sketch. Handles mouse events for drawing.
 │                           # Exposes drawPoint() and clearCanvas() via forwardRef + useImperativeHandle
 │                           # so App.js can invoke them when server messages arrive.
 └── hooks/
@@ -39,7 +39,7 @@ src/
 | File | Responsibility |
 |---|---|
 | `App.js` | Color generation, message routing, callback wiring |
-| `Canvas.jsx` | Canvas API drawing, mouse event handling, imperative API |
+| `Canvas.jsx` | P5.js sketch setup, mouse event handling, imperative API |
 | `useSocket.js` | STOMP client setup, subscription, publish, cleanup |
 
 ---
@@ -67,16 +67,17 @@ cd lab05-arsw-frontend
 npm install
 ```
 
-**3. Install required WebSocket libraries** (if not already present in `package.json`)
+**3. Install required libraries** (if not already present in `package.json`)
 
 ```bash
-npm install @stomp/stompjs sockjs-client
+npm install @stomp/stompjs sockjs-client p5
 ```
 
 | Package | Purpose |
 |---|---|
 | `@stomp/stompjs` | STOMP protocol client for WebSocket messaging |
 | `sockjs-client` | SockJS transport layer, provides WebSocket fallback support |
+| `p5` | P5.js creative coding library used for canvas rendering |
 
 ---
 
@@ -167,7 +168,7 @@ const onClear = useCallback(() => {
 
 ## How the Canvas Component Works
 
-`src/components/Canvas.jsx` is a controlled React component responsible for all drawing operations. It is wrapped with `forwardRef` so that `App.js` can hold a ref to it and call its internal methods imperatively when server messages arrive.
+`src/components/Canvas.jsx` is a controlled React component responsible for all drawing operations.
 
 ### Props
 
@@ -175,7 +176,30 @@ const onClear = useCallback(() => {
 |---|---|---|
 | `onDraw` | function | Called with `(x, y)` whenever the user draws a point. Triggers a message send in `App.js`. |
 | `onClear` | function | Called when the user clicks the clear button. Triggers a CLEAR message send in `App.js`. |
-| `color` | string | The hex color assigned to this user, used for all local drawing strokes. |
+| `color` | string | The hex color assigned to this user, used for all drawing strokes. |
+
+### P5 Instance 
+
+The sketch is created once on mount using `new p5(sketch, container)`. `p.noLoop()` is called in `setup` so P5 does not run a continuous animation frame — drawing only happens in response to mouse events, which is more efficient for a whiteboard use case.
+
+```js
+useEffect(() => {
+  const sketch = (p) => {
+    p.setup = () => {
+      const canvas = p.createCanvas(CANVAS_WIDTH, CANVAS_HEIGHT);
+      canvas.parent(containerRef.current);
+      p.background(255);
+      p.noLoop();
+    };
+    // mouse handlers and drawDot defined here...
+  };
+
+  const p5Instance = new p5(sketch);
+  p5Ref.current = p5Instance;
+
+  return () => p5Instance.remove(); // Cleanup on unmount
+}, []);
+```
 
 ### Drawing Flow
 
@@ -185,40 +209,42 @@ Every mouse interaction follows the same two-step pattern:
 
 **2. Publish to server** — `onDraw(x, y)` is called, which propagates up to `App.js` and then to `useSocket.sendMessage()`, broadcasting the stroke to all other clients.
 
+P5's `mousePressed` fires on click and `mouseDragged` fires while the button is held, replacing the previous React `onMouseDown`/`onMouseMove`/`onMouseUp` handler chain:
+
 ```js
-const handleMouseMove = (e) => {
-  if (!isDrawing.current) return;
-  const { x, y } = getCanvasCoords(e);
-  drawPoint(x, y, color);   // Step 1: local render
-  onDraw(x, y);             // Step 2: publish to server
+p.mousePressed = () => {
+  if (!inBounds()) return;
+  p.drawDot(p.mouseX, p.mouseY, colorRef.current); // Step 1: local render
+  onDrawRef.current(p.mouseX, p.mouseY);           // Step 2: publish to server
+};
+
+p.mouseDragged = () => {
+  if (!inBounds()) return;
+  p.drawDot(p.mouseX, p.mouseY, colorRef.current);
+  onDrawRef.current(p.mouseX, p.mouseY);
 };
 ```
-
 
 ### Coordinate Calculation
 
-Mouse event coordinates from the browser are relative to the viewport. `getCanvasCoords` converts them to be relative to the canvas element's top-left corner using `getBoundingClientRect()`:
+P5 automatically tracks the mouse position relative to the canvas via `p.mouseX` and `p.mouseY`. No manual `getBoundingClientRect()` conversion is needed. An `inBounds()` guard ensures drawing is ignored when the mouse is outside the canvas area, since P5 mouse events fire globally on the page:
 
 ```js
-const getCanvasCoords = (e) => {
-  const rect = canvasRef.current.getBoundingClientRect();
-  return {
-    x: e.clientX - rect.left,
-    y: e.clientY - rect.top,
-  };
-};
+const inBounds = () =>
+  p.mouseX >= 0 && p.mouseX <= CANVAS_WIDTH &&
+  p.mouseY >= 0 && p.mouseY <= CANVAS_HEIGHT;
 ```
-
-This ensures that drawn points are accurate regardless of the canvas position on the page.
 
 ### Canvas Initialization
 
-On mount, `useEffect` calls `clearCanvas()` to paint the canvas white. Without this, the default canvas background is transparent, which would produce unexpected visual results.
+The white background is painted inside P5's `setup` function using `p.background(255)`
 
 ```js
-useEffect(() => {
-  clearCanvas();
-}, [clearCanvas]);
+p.setup = () => {
+  p.createCanvas(CANVAS_WIDTH, CANVAS_HEIGHT);
+  p.background(255); // White background on mount
+  p.noLoop();
+};
 ```
 
 ## How the useSocket Hook Works
