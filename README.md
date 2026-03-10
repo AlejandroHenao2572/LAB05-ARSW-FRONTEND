@@ -34,6 +34,10 @@ src/
                             # and exposes a sendMessage() function for publishing draw events.
 ```
 
+
+## AzureDeploy link
+[BackEnd Azure Deploy Link](collaborativeboardfront-dba4g4cjfjgkgbfr.eastus2-01.azurewebsites.net)
+
 ### Responsibilities by file
 
 | File | Responsibility |
