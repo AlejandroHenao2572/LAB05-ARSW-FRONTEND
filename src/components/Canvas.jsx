@@ -34,7 +34,7 @@ const Canvas = forwardRef(({ onDraw, onClear, color }, ref) => {
 
     //Draw a filled circle (point) at (x, y) with the specified color
     ctx.beginPath();                  
-    ctx.arc(x, y, 10, 0, Math.PI * 2); 
+    ctx.arc(x, y, 5, 0, Math.PI * 2); 
     ctx.fillStyle = color;            
     ctx.fill();                       
     ctx.closePath();                  
@@ -138,8 +138,8 @@ const Canvas = forwardRef(({ onDraw, onClear, color }, ref) => {
     <div>
       <canvas
         ref={canvasRef}
-        width={640}
-        height={480}
+        width={800}
+        height={500}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
