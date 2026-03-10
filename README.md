@@ -1,70 +1,313 @@
-# Getting Started with Create React App
+# LAB5 - Collaborative Whiteboard — React Frontend
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A real-time collaborative drawing application built with React. Multiple users can draw simultaneously on a shared canvas, each assigned a unique color. All drawing actions and canvas clearing are broadcast instantly to every connected client via WebSockets using the STOMP protocol over SockJS.
 
-## Available Scripts
+## Project Description
 
-In the project directory, you can run:
+This frontend is a React application that interfaces with a Spring Boot WebSocket backend. It uses **P5.js** (in instance mode) to render drawing operations and **@stomp/stompjs** with **SockJS** to maintain a persistent, full-duplex connection to the server.
 
-### `npm start`
+When a user draws on the canvas, the coordinates and color are published to the backend via STOMP. The backend broadcasts the message to all subscribers, so every connected client renders the same stroke in real time. The same mechanism handles global canvas clearing.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Key Features
 
-### `npm test`
+- **Real-time synchronization** — Drawing strokes appear on all connected clients simultaneously via WebSocket messaging (STOMP over SockJS).
+- **Random user color assignment** — Each user is assigned a unique random hex color on page load, making it easy to distinguish contributors.
+- **Global canvas clearing** — Any user can clear the board for all connected clients with a single button press.
+- **Modular architecture** — Canvas rendering, WebSocket logic, and application state are cleanly separated into components and custom hooks.
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+---
 
-### `npm run build`
+## Project Structure
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+```
+src/
+├── App.js                  # Root component. Owns application state, color assignment,
+│                           # and coordinates communication between Canvas and useSocket.
+├── components/
+│   └── Canvas.jsx          # Creates a P5.js sketch. Handles mouse events for drawing.
+│                           # Exposes drawPoint() and clearCanvas() via forwardRef + useImperativeHandle
+│                           # so App.js can invoke them when server messages arrive.
+└── hooks/
+    └── useSocket.js        # Custom hook that manages the STOMP client lifecycle.
+                            # Connects to the backend on mount, subscribes to /topic/draw,
+                            # and exposes a sendMessage() function for publishing draw events.
+```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### Responsibilities by file
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+| File | Responsibility |
+|---|---|
+| `App.js` | Color generation, message routing, callback wiring |
+| `Canvas.jsx` | P5.js sketch setup, mouse event handling, imperative API |
+| `useSocket.js` | STOMP client setup, subscription, publish, cleanup |
 
-### `npm run eject`
+---
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+## Prerequisites
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+- [Node.js](https://nodejs.org/) v16 or higher
+- npm v8 or higher
+- The Spring Boot backend running and accessible (default: `http://localhost:8080`)
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+---
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+## Installation
 
-## Learn More
+**1. Clone the repository**
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+```bash
+git clone <repository-url>
+cd lab05-arsw-frontend
+```
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+**2. Install dependencies**
 
-### Code Splitting
+```bash
+npm install
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+**3. Install required libraries** (if not already present in `package.json`)
 
-### Analyzing the Bundle Size
+```bash
+npm install @stomp/stompjs sockjs-client p5
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+| Package | Purpose |
+|---|---|
+| `@stomp/stompjs` | STOMP protocol client for WebSocket messaging |
+| `sockjs-client` | SockJS transport layer, provides WebSocket fallback support |
+| `p5` | P5.js creative coding library used for canvas rendering |
 
-### Making a Progressive Web App
+---
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+## Environment Variables
 
-### Advanced Configuration
+By default, the backend URL is hardcoded in `src/hooks/useSocket.js`:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+```js
+webSocketFactory: () => new SockJS('http://localhost:8080/ws-board'),
+```
 
-### Deployment
+To make this configurable without modifying source code, create a `.env` file at the project root:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+```
+REACT_APP_WS_URL=http://localhost:8080/ws-board
+```
 
-### `npm run build` fails to minify
+Then update `useSocket.js` to read the variable:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+```js
+webSocketFactory: () => new SockJS(process.env.REACT_APP_WS_URL),
+```
+
+---
+
+## How App.js Works
+
+`src/App.js` is the root component and the central coordinator of the application. 
+
+### User Color Assignment
+
+A random hex color is generated once at module level, outside the component function. This means the color is assigned when the JavaScript module is first loaded and never changes for the lifetime of the session, even across re-renders.
+
+```js
+const USER_COLOR = generateRandomColor(); // Runs once on page load
+
+function App() { ... } // USER_COLOR is stable across all renders
+```
+
+Placing it outside the component is intentional: if it were inside, a new color would be generated on every re-render.
+
+### Connecting the Layers
+
+`App.js` initializes the WebSocket hook and the canvas ref, then passes the right callbacks down to `Canvas`:
+
+```
+useSocket(onMessageReceived)  →  gives back sendMessage()
+                                         │
+                           ┌─────────────┴─────────────┐
+                       onDraw(x,y)               onClear()
+                           │                         │
+                     sendMessage(DRAW)        sendMessage(CLEAR)
+```
+
+The `canvasRef` points to the `Canvas` component instance, which exposes `drawPoint()` and `clearCanvas()`.
+
+### Message Routing
+
+`onMessageReceived` is the single entry point for all incoming WebSocket messages. It inspects the `type` field and delegates to the appropriate canvas method:
+
+```js
+const onMessageReceived = useCallback((message) => {
+  if (!canvasRef.current) return;
+
+  if (message.type === 'DRAW') {
+    canvasRef.current.drawPoint(message);   // Renders the remote stroke
+  } else if (message.type === 'CLEAR') {
+    canvasRef.current.clearCanvas();        // Wipes the canvas for all users
+  }
+}, []);
+```
+
+
+### Callback Memoization
+
+Both `onDraw` and `onClear` are memoized with `useCallback` to avoid passing new function references to `Canvas` on every render, which would defeat React's `memo` optimizations on child components.
+
+```js
+const onDraw = useCallback((x, y) => {
+  sendMessage({ x, y, color: USER_COLOR, type: 'DRAW' });
+}, [sendMessage]);
+
+const onClear = useCallback(() => {
+  sendMessage({ x: 0, y: 0, color: USER_COLOR, type: 'CLEAR' });
+}, [sendMessage]);
+```
+
+
+## How the Canvas Component Works
+
+`src/components/Canvas.jsx` is a controlled React component responsible for all drawing operations.
+
+### Props
+
+| Prop | Type | Description |
+|---|---|---|
+| `onDraw` | function | Called with `(x, y)` whenever the user draws a point. Triggers a message send in `App.js`. |
+| `onClear` | function | Called when the user clicks the clear button. Triggers a CLEAR message send in `App.js`. |
+| `color` | string | The hex color assigned to this user, used for all drawing strokes. |
+
+### P5 Instance 
+
+The sketch is created once on mount using `new p5(sketch, container)`. `p.noLoop()` is called in `setup` so P5 does not run a continuous animation frame — drawing only happens in response to mouse events, which is more efficient for a whiteboard use case.
+
+```js
+useEffect(() => {
+  const sketch = (p) => {
+    p.setup = () => {
+      const canvas = p.createCanvas(CANVAS_WIDTH, CANVAS_HEIGHT);
+      canvas.parent(containerRef.current);
+      p.background(255);
+      p.noLoop();
+    };
+    // mouse handlers and drawDot defined here...
+  };
+
+  const p5Instance = new p5(sketch);
+  p5Ref.current = p5Instance;
+
+  return () => p5Instance.remove(); // Cleanup on unmount
+}, []);
+```
+
+### Drawing Flow
+
+Every mouse interaction follows the same two-step pattern:
+
+**1. Local render** — The point is drawn immediately on the local canvas without waiting for the server, making the experience feel instant.
+
+**2. Publish to server** — `onDraw(x, y)` is called, which propagates up to `App.js` and then to `useSocket.sendMessage()`, broadcasting the stroke to all other clients.
+
+P5's `mousePressed` fires on click and `mouseDragged` fires while the button is held, replacing the previous React `onMouseDown`/`onMouseMove`/`onMouseUp` handler chain:
+
+```js
+p.mousePressed = () => {
+  if (!inBounds()) return;
+  p.drawDot(p.mouseX, p.mouseY, colorRef.current); // Step 1: local render
+  onDrawRef.current(p.mouseX, p.mouseY);           // Step 2: publish to server
+};
+
+p.mouseDragged = () => {
+  if (!inBounds()) return;
+  p.drawDot(p.mouseX, p.mouseY, colorRef.current);
+  onDrawRef.current(p.mouseX, p.mouseY);
+};
+```
+
+### Coordinate Calculation
+
+P5 automatically tracks the mouse position relative to the canvas via `p.mouseX` and `p.mouseY`. No manual `getBoundingClientRect()` conversion is needed. An `inBounds()` guard ensures drawing is ignored when the mouse is outside the canvas area, since P5 mouse events fire globally on the page:
+
+```js
+const inBounds = () =>
+  p.mouseX >= 0 && p.mouseX <= CANVAS_WIDTH &&
+  p.mouseY >= 0 && p.mouseY <= CANVAS_HEIGHT;
+```
+
+### Canvas Initialization
+
+The white background is painted inside P5's `setup` function using `p.background(255)`
+
+```js
+p.setup = () => {
+  p.createCanvas(CANVAS_WIDTH, CANVAS_HEIGHT);
+  p.background(255); // White background on mount
+  p.noLoop();
+};
+```
+
+## How the useSocket Hook Works
+
+`src/hooks/useSocket.js` is a custom React hook that encapsulates the entire WebSocket lifecycle. It accepts a single argument — `onMessageReceived`, a callback function — and returns `{ sendMessage }` for the caller to publish messages.
+
+
+The hook uses `useEffect` with an empty dependency array `[]`, which means the connection is established once when the component mounts and torn down when it unmounts.
+
+```js
+useEffect(() => {
+  const stompClient = new Client({ ... });
+  stompClient.activate();
+  clientRef.current = stompClient;
+
+  return () => {
+    stompClient.deactivate(); // Cleanup on unmount
+  };
+}, []);
+```
+
+
+### Connection and Subscription
+
+Inside `onConnect`, the client subscribes to the `/topic/draw` destination. Every message published to that topic by the backend is received here, parsed from JSON, and forwarded to the `onMessageReceived` callback provided by `App.js`.
+
+```js
+onConnect: () => {
+  stompClient.subscribe('/topic/draw', (stompMessage) => {
+    const drawMessage = JSON.parse(stompMessage.body);
+    onMessageReceived(drawMessage); // Delegates to App.js
+  });
+}
+```
+
+### Publishing Messages
+
+`sendMessage` checks that the client exists and is currently connected before publishing. If the connection is not ready (e.g., still establishing), it logs a warning and drops the message rather than throwing.
+
+```js
+const sendMessage = (drawMessage) => {
+  if (clientRef.current && clientRef.current.connected) {
+    clientRef.current.publish({
+      destination: '/app/draw',
+      body: JSON.stringify(drawMessage),
+    });
+  } else {
+    console.warn('Failed to send message: STOMP client is not connected.');
+  }
+};
+```
+
+Messages are sent to `/app/draw`, which maps to the `@MessageMapping("/draw")` method in the Spring Boot controller. The controller then broadcasts the message to all `/topic/draw` subscribers.
+
+### Message Shape
+
+All messages — both sent and received — share the same structure:
+
+| Field | Type | Description |
+|---|---|---|
+| `x` | number | X coordinate on the canvas |
+| `y` | number | Y coordinate on the canvas |
+| `color` | string | Hex color of the drawing user (e.g. `#a3f21c`) |
+| `type` | string | `"DRAW"` to render a point, `"CLEAR"` to wipe the canvas |
+
+---
