@@ -36,7 +36,7 @@ src/
 
 
 ## AzureDeploy link
-[BackEnd Azure Deploy Link](collaborativeboardfront-dba4g4cjfjgkgbfr.eastus2-01.azurewebsites.net)
+[FrontEnd Azure Deploy Link](collaborativeboardfront-dba4g4cjfjgkgbfr.eastus2-01.azurewebsites.net)
 
 ### Responsibilities by file
 

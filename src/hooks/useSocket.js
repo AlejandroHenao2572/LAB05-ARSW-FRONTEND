@@ -6,6 +6,13 @@ const useSocket = (onMessageReceived) => {
 
   const clientRef = useRef(null);
 
+  // Mirror the callback into a ref so the effect never needs it as a dependency.
+  // This prevents the WebSocket from reconnecting every time the parent re-renders.
+  const onMessageReceivedRef = useRef(onMessageReceived);
+  useEffect(() => {
+    onMessageReceivedRef.current = onMessageReceived;
+  }, [onMessageReceived]);
+
   useEffect(() => {
     //Create a new STOMP client 
     //Every time the component mounts, we create a new STOMP client and connect to the server.
@@ -24,7 +31,7 @@ const useSocket = (onMessageReceived) => {
           const drawMessage = JSON.parse(stompMessage.body);
 
           //Delegate the received message to the provided callback function
-          onMessageReceived(drawMessage);
+          onMessageReceivedRef.current(drawMessage);
         });
       },
 
