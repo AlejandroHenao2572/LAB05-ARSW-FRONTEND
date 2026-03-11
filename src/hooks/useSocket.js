@@ -21,7 +21,8 @@ const useSocket = (onMessageReceived) => {
 
       // SockJS factory is used instead of brokerURL because the Spring Boot backend
       // uses SockJS, which requires HTTP(S) URLs and transport negotiation.
-      webSocketFactory: () => new SockJS(process.env.REACT_APP_WS_URL),
+      // Change to local URL (http://localhost:8080/ws-board) when running the backend locally.
+      webSocketFactory: () => new SockJS("http://spring-backend-env.eba-rt85uc2x.us-east-1.elasticbeanstalk.com/ws-board"),
       reconnectDelay: 5000,
 
       onConnect: () => {
