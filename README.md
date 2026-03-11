@@ -35,8 +35,10 @@ src/
 ```
 
 
-## AzureDeploy link
-[FrontEnd Azure Deploy Link](collaborativeboardfront-dba4g4cjfjgkgbfr.eastus2-01.azurewebsites.net)
+## Deploy
+The deployment of the frontend is done in AWS Amplify
+
+[FrontEnd AWS Deploy Link](https://main.d3bxl4knlpk0d5.amplifyapp.com)
 
 ### Responsibilities by file
 
